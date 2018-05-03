@@ -32,6 +32,7 @@ bool activeListMenu = false;
 bool activeNewUserMenu = false;
 bool activeDeleteMenu = false;
 bool activeModifyMenu = false;
+bool activeModifyMenu2 = false;
 bool activeMainMenu = false;
 
 int scene = 0;
@@ -73,6 +74,33 @@ static int callbackSelect(void *NotUsed, int argc, char **argv, char **azColName
 		foundedUser = true;
 		errMsg = "User found";
 	 }
+   return 0;
+	 
+	 //Cambiar el user por un array de strings para poder controlarlo desde el bucle y luego meterselos con el for segundo
+}
+
+static int callbackModify(void *NotUsed, int argc, char **argv, char **azColName) {
+	callbacks++;
+	readUsers = (User*) calloc (callbacks, sizeof(User));
+   int i;
+	 /*for(i = 0; i<argc; i++) {
+      printf("% 17s    ", azColName[i]);
+   }
+   printf("\n");*/
+   for(i = 0; i<argc; i++) {
+      printf("% 12s    ", argv[i] ? argv[i] : "NULL");
+   }
+	 
+	 newUser.username = argv[0];
+	 newUser.email = argv[1];
+	 newUser.password = argv[2];
+	 newUser.name = argv[3];
+	 newUser.surnames = argv[4];
+	 newUser.birthdate = argv[5];
+	 newUser.province = argv[6];
+	 newUser.country = argv[7];
+	 newUser.credits = argv[8];
+	 
    return 0;
 	 
 	 //Cambiar el user por un array de strings para poder controlarlo desde el bucle y luego meterselos con el for segundo
@@ -189,7 +217,6 @@ void SelectUserDB(){
 			fprintf(stderr, "Can't open database: %s\n", sqlite3_errmsg(db));
 		}
 		
-		//Terminar este sql
 		sql = "SELECT Username FROM USERS WHERE Username = '" + userSearch + "';";
 
 		char *sqlChar = new char[sql.length() + 1];
@@ -223,16 +250,53 @@ void ModifyUserDB(){
 			fprintf(stderr, "Can't open database: %s\n", sqlite3_errmsg(db));
 		}
 		
-		//Terminar este sql
-		sql = "UPDATE USERS SET Credits = '1'" \
-					"WHERE Username = '" + userSearch + "';";
+		sql = "SELECT * FROM USERS WHERE Username = '" + userSearch + "';";
 
 		char *sqlChar = new char[sql.length() + 1];
 		strcpy(sqlChar, sql.c_str());
 					
 		/* Execute SQL statement */
-		rc = sqlite3_exec(db, sqlChar, callback, (void*)data, &zErrMsg);
+		rc = sqlite3_exec(db, sqlChar, callbackModify, (void*)data, &zErrMsg);
 		 
+		if( rc != SQLITE_OK ) {
+			fprintf(stderr, "SQL error: %s\n", zErrMsg);
+			sqlite3_free(zErrMsg);
+		}
+		sqlite3_close(db);
+}
+
+void UpdateUserDB(){
+		sqlite3 *db;
+		char *zErrMsg = 0;
+		int rc;
+		std::string sql;
+		const char* data = "Callback function called";
+
+		/* Open database */
+		rc = sqlite3_open("Asteroids_db.db", &db);
+		 
+		if( rc ) {
+			fprintf(stderr, "Can't open database: %s\n", sqlite3_errmsg(db));
+		}
+		
+		sql = "DELETE FROM USERS WHERE Username = '" + userSearch + "';";
+
+		char *sqlChar = new char[sql.length() + 1];
+		strcpy(sqlChar, sql.c_str());
+				
+		/* Execute SQL statement */
+		rc = sqlite3_exec(db, sqlChar, callbackModify, (void*)data, &zErrMsg);
+		
+		sql = "INSERT INTO USERS (Username, Email, Password, Name, Surnames, Birthdate, Province, Country, Credits) "  \
+					 "VALUES ('"+newUser.username+"', '"+newUser.email+"', '"+newUser.password+"', '"+newUser.name+"', '" \
+					 +newUser.surnames+"', '"+newUser.birthdate+"', '"+newUser.province+"', '"+newUser.country+"', '"+newUser.credits+"'); ";
+		 
+		sqlChar = new char[sql.length() + 1];
+		strcpy(sqlChar, sql.c_str());
+				
+		/* Execute SQL statement */
+		rc = sqlite3_exec(db, sqlChar, callbackModify, (void*)data, &zErrMsg);
+		
 		if( rc != SQLITE_OK ) {
 			fprintf(stderr, "SQL error: %s\n", zErrMsg);
 			sqlite3_free(zErrMsg);
@@ -316,6 +380,24 @@ void InitializeModifyMenu(){
 	menuBoxes[1].CreateBox(200, 150, 400, 40, &menuBoxes[1].boxPoints);
 	menuBoxes[2].CreateBox(300, 240, 200, 40, &menuBoxes[2].boxPoints);
 	menuBoxes[3].CreateBox(300, 400, 200, 40, &menuBoxes[3].boxPoints);
+}
+
+void InitializeModifyMenu2(){
+	errMsg = "";
+	menuBoxes = (Box*) calloc(13, sizeof(Box));
+	menuBoxes[0].CreateBox(220, 110, 400, 40, &menuBoxes[0].boxPoints);
+	menuBoxes[1].CreateBox(220, 160, 400, 40, &menuBoxes[1].boxPoints);
+	menuBoxes[2].CreateBox(220, 210, 400, 40, &menuBoxes[2].boxPoints);
+	menuBoxes[3].CreateBox(220, 260, 400, 40, &menuBoxes[3].boxPoints);
+	menuBoxes[4].CreateBox(220, 310, 400, 40, &menuBoxes[4].boxPoints);
+	menuBoxes[5].CreateBox(220, 360, 400, 40, &menuBoxes[5].boxPoints);
+	menuBoxes[6].CreateBox(220, 410, 400, 40, &menuBoxes[6].boxPoints);
+	menuBoxes[7].CreateBox(220, 460, 400, 40, &menuBoxes[7].boxPoints);
+	menuBoxes[8].CreateBox(220, 510, 400, 40, &menuBoxes[8].boxPoints);
+	menuBoxes[9].CreateBox(193, 577, 200, 40, &menuBoxes[9].boxPoints);
+	menuBoxes[10].CreateBox(405, 577, 250, 40, &menuBoxes[10].boxPoints);
+	menuBoxes[11].CreateBox(640, 160, 40, 40, &menuBoxes[11].boxPoints);
+	menuBoxes[12].CreateBox(640, 360, 40, 40, &menuBoxes[12].boxPoints);
 }
 
 void MainMenu(){
@@ -514,10 +596,81 @@ void ModifyUserMenu(){
 	if(foundedUser){
 		if(menuBoxes[3].isMouseOver() && esat::MouseButtonDown(0)){
 			ModifyUserDB();
+			scene = 5;
+			activeModifyMenu2 = true;
 		}
 		menuBoxes[3].DrawButton(menuBoxes[3].isMouseOver(), white);
 		DrawTextPlus(340, 433, "Modify", black, white, menuBoxes[3]);
 	}
+}
+
+void ModifyUserMenu2(){
+	esat::DrawSetFillColor(255, 255, 255);
+	esat::DrawSetTextSize(80);
+	esat::DrawText(180, 80, "Modify user");
+	esat::DrawSetTextSize(40);
+	esat::DrawText(20, 140, "Username");
+	esat::DrawText(20, 190, "Email");
+	esat::DrawText(20, 240, "Password");
+	esat::DrawText(20, 290, "Name");
+	esat::DrawText(20, 340, "Surnames");
+	esat::DrawText(20, 390, "Birthdate");
+	esat::DrawText(20, 440, "Province");
+	esat::DrawText(20, 490, "Country");
+	esat::DrawText(20, 540, "Credits");
+	esat::DrawText(50, 675, errMsg);
+	
+	TextField(&menuBoxes[0], &newUser.username);
+	if(menuBoxes[0].isMouseOver() && esat::MouseButtonDown(0)) DeselectTextFields(9, &menuBoxes[0]);
+	
+	TextField(&menuBoxes[1], &newUser.email);
+	if(menuBoxes[1].isMouseOver() && esat::MouseButtonDown(0)) DeselectTextFields(9, &menuBoxes[1]);
+
+	TextField(&menuBoxes[2], &newUser.password);
+	if(menuBoxes[2].isMouseOver() && esat::MouseButtonDown(0)) DeselectTextFields(9, &menuBoxes[2]);
+	
+	TextField(&menuBoxes[3], &newUser.name);
+	if(menuBoxes[3].isMouseOver() && esat::MouseButtonDown(0)) DeselectTextFields(9, &menuBoxes[3]);
+	
+	TextField(&menuBoxes[4], &newUser.surnames);
+	if(menuBoxes[4].isMouseOver() && esat::MouseButtonDown(0)) DeselectTextFields(9, &menuBoxes[4]);
+	
+	TextField(&menuBoxes[5], &newUser.birthdate);
+	if(menuBoxes[5].isMouseOver() && esat::MouseButtonDown(0)) DeselectTextFields(9, &menuBoxes[5]);
+	
+	TextField(&menuBoxes[6], &newUser.province);
+	if(menuBoxes[6].isMouseOver() && esat::MouseButtonDown(0)) DeselectTextFields(9, &menuBoxes[6]);
+	
+	TextField(&menuBoxes[7], &newUser.country);
+	if(menuBoxes[7].isMouseOver() && esat::MouseButtonDown(0)) DeselectTextFields(9, &menuBoxes[7]);
+	
+	TextField(&menuBoxes[8], &newUser.credits);
+	if(menuBoxes[8].isMouseOver() && esat::MouseButtonDown(0)) DeselectTextFields(9, &menuBoxes[8]);
+
+	if(menuBoxes[9].isMouseOver() && esat::MouseButtonDown(0)){
+		scene = 0;
+		activeMainMenu = true;
+	}
+	menuBoxes[9].DrawButton(menuBoxes[9].isMouseOver(), white);
+	DrawTextPlus(225, 610, "Return", black, white, menuBoxes[9]);
+	
+	if(menuBoxes[10].isMouseOver() && esat::MouseButtonDown(0)){
+		UpdateUserDB();
+	}
+	menuBoxes[10].DrawButton(menuBoxes[10].isMouseOver(), white);
+	DrawTextPlus(425, 610, "Modify user", black, white, menuBoxes[10]);
+	
+	if(menuBoxes[11].isMouseOver() && esat::MouseButtonDown(0)){
+		newUser.email += '@';
+	}
+	menuBoxes[11].DrawButton(menuBoxes[11].isMouseOver(), white);
+	DrawTextPlus(651, 195, "@", black, white, menuBoxes[11]);
+	
+	if(menuBoxes[12].isMouseOver() && esat::MouseButtonDown(0)){
+		newUser.birthdate += '/';
+	}
+	menuBoxes[12].DrawButton(menuBoxes[12].isMouseOver(), white);
+	DrawTextPlus(653, 395, "/", black, white, menuBoxes[12]);
 }
 
 void MenuController(){
@@ -550,6 +703,12 @@ void MenuController(){
 		activeModifyMenu = false;
 	}
 	if(scene == 4) ModifyUserMenu();
+	
+	if(activeModifyMenu2) {
+		InitializeModifyMenu2();
+		activeModifyMenu2 = false;
+	}
+	if(scene == 5) ModifyUserMenu2();
 }
 
 void Exit(){

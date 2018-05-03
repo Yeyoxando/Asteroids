@@ -27,7 +27,7 @@ struct User{
 	std::string birthdate;
 	std::string province;
 	std::string country;
-	std::string credits;
+	std::string credits = "10";
 };
 
 struct Player{
@@ -67,6 +67,7 @@ bool activeAddUserMenu = false;
 bool activeHighScoreMenu = false;
 
 char* auxString = (char*) calloc (80, sizeof(char));
+char* auxString2 = (char*) calloc (80, sizeof(char));
 
 Player players[2];
 TObstacle* obstacles;
@@ -519,8 +520,8 @@ void AddUserMenu(){
 	TextField(&menuBoxes[7], &newUser.country);
 	if(menuBoxes[7].isMouseOver() && esat::MouseButtonDown(0)) DeselectTextFields(9, &menuBoxes[7]);
 	
-	TextField(&menuBoxes[8], &newUser.credits);
-	if(menuBoxes[8].isMouseOver() && esat::MouseButtonDown(0)) DeselectTextFields(9, &menuBoxes[8]);
+	esat::DrawText(250, 540, "10");//TextField(&menuBoxes[8], &auxString);
+	//if(menuBoxes[8].isMouseOver() && esat::MouseButtonDown(0)) DeselectTextFields(9, &menuBoxes[8]);
  
 	if(menuBoxes[9].isMouseOver() && esat::MouseButtonDown(0)){
 		activeScene = 0;
@@ -586,17 +587,21 @@ void MainMenu(){
 	
 	if(selectPlayers){
 		if(menuBoxes[3].isMouseOver() && esat::MouseButtonDown(0)){
-			numOfPlayers = 1;
-			activeScene = 4;
-			userCredits--;
+			if(userCredits > 0){
+				numOfPlayers = 1;
+				activeScene = 4;
+				userCredits--;
+			}
 		}
 		menuBoxes[3].DrawButton(menuBoxes[3].isMouseOver(), white);
 		DrawTextPlus(690, 210, "1P", black, white, menuBoxes[3]);
 		
 		if(menuBoxes[4].isMouseOver() && esat::MouseButtonDown(0)){
-			numOfPlayers = 2;
-			activeScene = 4;
-			userCredits -= 2;
+			if(userCredits > 1){
+				numOfPlayers = 2;
+				activeScene = 4;
+				userCredits -= 2;
+			}
 		}
 		menuBoxes[4].DrawButton(menuBoxes[4].isMouseOver(), white);
 		DrawTextPlus(690, 290, "2P", black, white, menuBoxes[4]);
@@ -689,7 +694,8 @@ int esat::main(int argc, char **argv) {
 	srand(time(NULL));
 	
 	Init();
-	InitializePlayer(&players[currentPlayer]);
+	InitializePlayer(&players[0]);
+	InitializePlayer(&players[1]);
 	LoadLevel();
 	
 	while(esat::WindowIsOpened() && !esat::IsSpecialKeyDown(esat::kSpecialKey_Escape)) {
