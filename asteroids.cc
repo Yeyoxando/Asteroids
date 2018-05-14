@@ -12,11 +12,17 @@
 #include "lib_diego/ld_math.h"
 #include "lib_diego/ld_graphic.h"
 #include "lib_diego/ld_ui.h"
+#include "lib_diego/ld_physics.h"
 #include "lib_diego/ld_obstacleList.h"//The obstacle struct (asteroids and aliens) is here to use it with lists
 #include "lib_diego/ld_shootList.h"//The shoot struct is here to use it with lists
-#include "lib_diego/ld_physics.h"
 
 //Hacer un insert coin to guapo con la mondea en 3d dando vueltas
+
+struct HighScore{
+	std::string username;
+	std::string date;
+	int score;
+};
 
 struct User{
 	std::string username;
@@ -42,6 +48,7 @@ struct Player{
 	esat::Vec2 direction;
 	esat::Mat3 transform;
 	esat::Vec3* points;
+	BoxCollider2D boxCollider;
 	TShoot* shoots;
 };
 
@@ -59,12 +66,13 @@ const float height = 720;
 int activeScene = 0;
 int currentPlayer = 0;
 int numOfPlayers;
-float obstacleSpeed = 8;
+float obstacleSpeed = 2;
 
 bool activeLoginMenu = false;
 bool activeMainMenu = false;
 bool activeAddUserMenu = false;
 bool activeHighScoreMenu = false;
+bool deathPause;
 
 char* auxString = (char*) calloc (80, sizeof(char));
 char* auxString2 = (char*) calloc (80, sizeof(char));
@@ -81,21 +89,15 @@ sqlite3 *db;
 char* errMsg = (char*) calloc (80, sizeof(char));
 
 static int callback(void *NotUsed, int argc, char **argv, char **azColName) {
-   if(logUser[0] == argv[0] && logUser[1] == argv[1]){
-		 userCredits = atoi(argv[2]);
-		 logged = true;
-	 }
-	 else{errMsg = "Wrong user or password";}
-	 if(logUser[0].length() < 1 || logUser[1].length() < 1) errMsg = "Fill all the fields";
+	if(logUser[0] == argv[0] && logUser[1] == argv[1]){
+		userCredits = atoi(argv[2]);
+		logged = true;
+	}
+	else{errMsg = "Wrong user or password";}
 	 
-	 /*for(int i = 0; i<argc; i++) {
-      printf("% 17s    ", azColName[i]);
-   }*/
-   /*for(int i = 0; i<argc; i++) {
-      printf("% 12s    ", argv[i] ? argv[i] : "NULL");
-   }
-	 printf("\n");*/
-   return 0;
+	if(logUser[0].length() < 1 || logUser[1].length() < 1) errMsg = "Fill all the fields";
+
+	return 0;
 }
 
 void CreateDB(){
@@ -280,6 +282,7 @@ void InitializePlayer(Player *player){
 	(*player).scale.x = 20;
 	(*player).scale.y = 20;
 	(*player).transform = Mat3Transform((*player).position.x, (*player).position.y, (*player).rotation, (*player).scale.x, (*player).scale.y);
+	(*player).boxCollider = {1, 1, -1, -1};
 }
 
 void PlayerController(Player *player){
@@ -315,11 +318,49 @@ void PlayerController(Player *player){
 	if((*player).position.y < 0) (*player).position.y = height;
 	
 	(*player).transform = Mat3Transform((*player).position.x, (*player).position.y, (*player).scale.x, (*player).scale.y, (*player).rotation);
+	esat::Vec2 point1 = {1, 1};
+	esat::Vec2 point2 = {-1, -1};
+	esat::Mat3 colTransform = Mat3Transform((*player).position.x, (*player).position.y, (*player).scale.x, (*player).scale.y, 0);
+	point1 = esat::Mat3TransformVec2(colTransform, point1); 
+	point2 = esat::Mat3TransformVec2(colTransform, point2);
+	(*player).boxCollider.x1 = point2.x;
+	(*player).boxCollider.y1 = point2.y;
+	(*player).boxCollider.x2 = point1.x;
+	(*player).boxCollider.y2 = point1.y;
+	
+	float colliderShape[10];
+	
+	colliderShape[0] = (*player).boxCollider.x1;
+    colliderShape[1] = (*player).boxCollider.y1;
+    colliderShape[2] = (*player).boxCollider.x2;
+    colliderShape[3] = (*player).boxCollider.y1;
+    colliderShape[4] = (*player).boxCollider.x2;
+    colliderShape[5] = (*player).boxCollider.y2;
+    colliderShape[6] = (*player).boxCollider.x1;
+    colliderShape[7] = (*player).boxCollider.y2;
+    colliderShape[8] = (*player).boxCollider.x1;
+    colliderShape[9] = (*player).boxCollider.y1;
+	
+	esat::DrawSetStrokeColor(255, 0, 0);
+	esat::DrawPath(colliderShape, 5);
+	
+	esat::DrawSetStrokeColor(255, 255, 255);
 	DrawShape((*player).points, 6, (*player).transform);
 }
 
+void PlayerDeath(Player *player){
+	(*player).lifes--;
+	(*player).position.x = 480;
+	(*player).position.y = 360;
+	(*player).rotation = 0;
+	(*player).scale.x = 20;
+	(*player).scale.y = 20;
+	(*player).speed = 0;
+	(*player).transform = Mat3Transform((*player).position.x, (*player).position.y, (*player).rotation, (*player).scale.x, (*player).scale.y);
+}
+
 void InsertObstacle(TObstacle** objects, int size, esat::Vec2 position, int shape = rand()%4){
-	esat::Vec2 scale = {(float)10 * size, (float)10 * size};
+	esat::Vec2 scale = {(float)10 * size + 8 / size, (float)10 * size + 8 / size};
 	esat::Mat3 transform = Mat3Transform(position.x, position.y, scale.x, scale.y, 0);
 	esat::Vec3* points;
 	int numOfPoints;
@@ -365,35 +406,119 @@ void InsertObstacle(TObstacle** objects, int size, esat::Vec2 position, int shap
 		}while(direction.y == 0);
 	}
 	direction = Vec2Normalize(direction);
-	InsertObstacleInList(&*objects, shape, position, scale, transform, points, numOfPoints, direction, size);
+	BoxCollider2D boxCol = {1, 1, -1, -1};
+	InsertObstacleInList(&*objects, shape, position, scale, transform, points, numOfPoints, direction, size, boxCol);
 }
 
 void MoveObstacle(TObstacle** objects){
 	TObstacle* node = *objects;
-	node->position.x += node->direction.x * (obstacleSpeed / node->size);
-	node->position.y += node->direction.y * (obstacleSpeed / node->size);
+	node->position.x += node->direction.x * obstacleSpeed;
+	node->position.y += node->direction.y * obstacleSpeed;
 	node->transform = Mat3Transform(node->position.x, node->position.y, node->scale.x, node->scale.y, 0);
 	
 	if(node->position.x > width) node->position.x = 0;
 	if(node->position.x < 0) node->position.x = width;
 	if(node->position.y > height) node->position.y = 0;
 	if(node->position.y < 0) node->position.y = height;
+	
+	esat::Vec2 point1 = {1, 1};
+	esat::Vec2 point2 = {-1, -1};
+	point1 = esat::Mat3TransformVec2(node->transform, point1); 
+	point2 = esat::Mat3TransformVec2(node->transform, point2);
+	node->boxCollider.x1 = point2.x;
+	node->boxCollider.y1 = point2.y;
+	node->boxCollider.x2 = point1.x;
+	node->boxCollider.y2 = point1.y;
+	
+	float colliderShape[10];
+	
+	colliderShape[0] = node->boxCollider.x1;
+    colliderShape[1] = node->boxCollider.y1;
+    colliderShape[2] = node->boxCollider.x2;
+    colliderShape[3] = node->boxCollider.y1;
+    colliderShape[4] = node->boxCollider.x2;
+    colliderShape[5] = node->boxCollider.y2;
+    colliderShape[6] = node->boxCollider.x1;
+    colliderShape[7] = node->boxCollider.y2;
+    colliderShape[8] = node->boxCollider.x1;
+    colliderShape[9] = node->boxCollider.y1;
+	
+	esat::DrawSetStrokeColor(255, 0, 0);
+	esat::DrawPath(colliderShape, 5);
+	
+	esat::DrawSetStrokeColor(255, 255, 255);
+}
+
+void CheckCollisions(TObstacle* objects, Player player){
+	TObstacle* node = objects;
+	if(CheckBox2DCollision(node->boxCollider, player.boxCollider)){
+		PlayerDeath(&players[currentPlayer]);
+		DeleteObstacleInList(&obstacles, node);
+		if(node->size > 1){
+			InsertObstacle(&obstacles, node->size/2, node->position);
+			InsertObstacle(&obstacles, node->size/2, node->position);
+		}
+	}
+}
+
+void CheckShootCollisions(TObstacle* objects){
+	TObstacle* node = objects;
+	TShoot* shoot = players[currentPlayer].shoots;
+	while(shoot){
+		esat::Vec2 shootPos = {shoot->position.x, shoot->position.y};
+		if(CheckBox2DCollision(node->boxCollider, shootPos)){
+			DeleteShootInList(&players[currentPlayer].shoots, shoot);
+			DeleteObstacleInList(&obstacles, node);
+			if(node->size > 1){
+				InsertObstacle(&obstacles, node->size/2, node->position);
+				InsertObstacle(&obstacles, node->size/2, node->position);
+			}
+			switch(node->size){
+				case 4:
+					players[currentPlayer].score += 20;
+					break;
+				case 2:
+					players[currentPlayer].score += 50;
+					break;
+				case 1:
+					players[currentPlayer].score += 100;
+					break;
+			}
+		}
+		shoot = (*shoot).prox;
+	}
 }
 
 void ObstacleDrawer(TObstacle* objects){
 	while(objects){
 		DrawShape((*objects).points, (*objects).numberOfPoints, (*objects).transform);
 		MoveObstacle(&objects);
+		CheckCollisions(objects, players[currentPlayer]);
+		CheckShootCollisions(objects);
 		objects = (*objects).prox;
 	}
 }
 
-void LoadLevel(){
-	esat::Vec2 nPosition = {200, 200};
-	InsertObstacle(&obstacles, 4, nPosition, 3);
-	InsertObstacle(&obstacles, 4, nPosition, 2);
-	InsertObstacle(&obstacles, 4, nPosition, 1);
-	InsertObstacle(&obstacles, 4, nPosition, 0);
+void AlienSpawner(){
+	
+}
+
+void LoadLevel(int level){
+	players[currentPlayer].position.x = 480;
+	players[currentPlayer].position.y = 360;
+	players[currentPlayer].rotation = 0;
+	players[currentPlayer].speed = 0;
+	
+	DeleteObstacleList(&obstacles);
+	int numOfAsteroids = 4 + level * 2;
+	if(numOfAsteroids > 12) numOfAsteroids = 12;
+	for(int i = 0 ; i < numOfAsteroids; i++){
+		int screenSide = rand()%2;
+		esat::Vec2 nPosition;
+		if(screenSide == 0) nPosition = {(float)(rand()%240), (float)(rand()%700)};
+		if(screenSide > 0) nPosition = {(float)(rand()%220) + 720, (float)(rand()%700)};
+		InsertObstacle(&obstacles, 4, nPosition);
+	}
 }
 
 void InitializeLoginMenu(){
@@ -520,8 +645,7 @@ void AddUserMenu(){
 	TextField(&menuBoxes[7], &newUser.country);
 	if(menuBoxes[7].isMouseOver() && esat::MouseButtonDown(0)) DeselectTextFields(9, &menuBoxes[7]);
 	
-	esat::DrawText(250, 540, "10");//TextField(&menuBoxes[8], &auxString);
-	//if(menuBoxes[8].isMouseOver() && esat::MouseButtonDown(0)) DeselectTextFields(9, &menuBoxes[8]);
+	esat::DrawText(250, 540, "10");
  
 	if(menuBoxes[9].isMouseOver() && esat::MouseButtonDown(0)){
 		activeScene = 0;
@@ -591,6 +715,7 @@ void MainMenu(){
 				numOfPlayers = 1;
 				activeScene = 4;
 				userCredits--;
+				LoadLevel(0);
 			}
 		}
 		menuBoxes[3].DrawButton(menuBoxes[3].isMouseOver(), white);
@@ -601,6 +726,7 @@ void MainMenu(){
 				numOfPlayers = 2;
 				activeScene = 4;
 				userCredits -= 2;
+				LoadLevel(0);
 			}
 		}
 		menuBoxes[4].DrawButton(menuBoxes[4].isMouseOver(), white);
@@ -618,6 +744,39 @@ void HighScoreMenu(){
 	DrawTextPlus(225, 680, "Return", black, white, menuBoxes[0]);
 }
 
+void CheckGameOver(){
+	if(players[currentPlayer].lifes < 0){
+		deathPause = true;
+		//Write info in high scores
+	}
+}
+
+void CheckLvlEnd(){
+	if(IsEmptyObstacleList(obstacles)){
+		players[currentPlayer].level++;
+		LoadLevel(players[currentPlayer].level);
+	}
+}
+
+int debugPosX1 = 280;
+int debugPosY1 = 150;
+int debugPosX2 = 340;
+int debugPosY2 = 300;
+int debugPosX3 = 480;
+int debugPosY3 = 300;
+
+void DeathScreen(){
+	esat::DrawSetTextSize(80);
+	esat::DrawSetFillColor(255, 255, 255);
+	esat::DrawText(280, 150, "Game over");
+	esat::DrawSetTextSize(40);
+	esat::DrawText(340, 300, "Score: ");
+	esat::DrawText(480, 300, itoa(players[currentPlayer].score, auxString, 10));
+	esat::DrawText(290, 700, "'M' to main menu");
+	/*esat::DrawText(170, 450, "You have reached a High score");
+	esat::DrawText(350, 500, "+5 credits");*/
+}
+
 void GameUI(){
 	esat::DrawSetTextSize(40);
 	esat::DrawSetStrokeColor(255, 255, 255);
@@ -630,13 +789,22 @@ void GameUI(){
 }
 
 void Game(){
-	ObstacleDrawer(obstacles);
-	ShootController(players[currentPlayer].shoots);
-	PlayerController(&players[currentPlayer]);
-	GameUI();
-	if(esat::IsKeyDown('M')){//Debug
+	if(!deathPause){
+		ObstacleDrawer(obstacles);
+		ShootController(players[currentPlayer].shoots);
+		PlayerController(&players[currentPlayer]);
+		GameUI();
+		CheckGameOver();
+		CheckLvlEnd();
+	}
+	else{
+		DeathScreen();
+	}
+	if(esat::IsKeyDown('M') && deathPause){
 		activeScene = 1;
 		activeMainMenu = true;
+		deathPause = false;
+		players[currentPlayer].lifes = 3;
 	}
 }
 
@@ -675,6 +843,7 @@ void SceneManager(){
 }
 
 void Init(){
+	//Read fic binario de scores
 	esat::DrawSetTextFont("resources/fonts/Hyperspace Bold.otf");
 	InitializeLoginMenu();
 	CreateDB();
@@ -696,7 +865,6 @@ int esat::main(int argc, char **argv) {
 	Init();
 	InitializePlayer(&players[0]);
 	InitializePlayer(&players[1]);
-	LoadLevel();
 	
 	while(esat::WindowIsOpened() && !esat::IsSpecialKeyDown(esat::kSpecialKey_Escape)) {
 		esat::DrawBegin();

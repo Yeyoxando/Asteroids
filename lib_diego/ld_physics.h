@@ -11,11 +11,7 @@ struct BoxCollider2D{
 	float y2;
 };
 
-struct PolyCollider2D{
-	esat::Vec3* points;
-};
-
-bool CheckBox2DCollisions(BoxCollider2D obj1, BoxCollider2D obj2) {
+bool CheckBox2DCollision(BoxCollider2D obj1, BoxCollider2D obj2) {
   bool first_check = false;
   bool second_check = false;
   int collision_points = 0;
@@ -42,14 +38,18 @@ bool CheckBox2DCollisions(BoxCollider2D obj1, BoxCollider2D obj2) {
   return first_check || second_check;
 }
 
-bool CheckPoly2DCollisions(PolyCollider2D obj1, PolyCollider2D obj2){
-	return 0;
-}
+bool CheckBox2DCollision(BoxCollider2D obj, esat::Vec2 point) {
+  bool first_check = false;
+  int collision_points = 0;
 
-bool CheckDotPoly2DCollisions(PolyCollider2D obj, esat::Vec3 dot){
-	return 0;
-}
+  if(obj.x1 < point.x && obj.x2 > point.x) {
+    collision_points++;
+  }
+  if(obj.y1 < point.y && obj.y2 > point.y)  {
+    collision_points++;
+  }
 
-/*///////////////////////////////////////////////////////////
-COLISIONES
-//////////////////////////////////////////////////////////*/
+  first_check = collision_points == 2;
+
+  return first_check;
+}////////////////////////////////////////////////////////*/

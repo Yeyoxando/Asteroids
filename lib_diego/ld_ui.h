@@ -85,13 +85,3 @@ void TextField(Box *box, std::string *referenceField, bool encrypted = false){
 		}
 	}
 }
- 
- 
-/*///////////////////////////////////////////////////////////
-Boton
-Cuadro de texto
-Funcion para centrar el texto
-Funcion para texto a la derecha
-Tablas
-Campos de numero
-//////////////////////////////////////////////////////////*/

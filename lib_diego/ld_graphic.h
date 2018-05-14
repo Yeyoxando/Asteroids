@@ -3,6 +3,7 @@
  *                                                   
  * Graphic commands & utilities      
  * Shapes 
+ * Colors
  */
  
 struct Color{

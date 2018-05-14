@@ -15,10 +15,11 @@ struct TObstacle{
 	int numberOfPoints;
 	esat::Vec2 direction;
 	int size;
+	BoxCollider2D boxCollider;
 	TObstacle* prox;
 };
 
-void InsertObstacleInList(TObstacle **list, int newShape, esat::Vec2 newPos, esat::Vec2 newScale, esat::Mat3 newTransform, esat::Vec3* newPoints, int numOfPoints, esat::Vec2 newDirection, int newSize){
+void InsertObstacleInList(TObstacle **list, int newShape, esat::Vec2 newPos, esat::Vec2 newScale, esat::Mat3 newTransform, esat::Vec3* newPoints, int numOfPoints, esat::Vec2 newDirection, int newSize, BoxCollider2D newCol){
   TObstacle *p = (TObstacle*)malloc(sizeof(TObstacle));
 
   p->shape = newShape;
@@ -29,6 +30,7 @@ void InsertObstacleInList(TObstacle **list, int newShape, esat::Vec2 newPos, esa
   p->numberOfPoints = numOfPoints;
   p->direction = newDirection;
   p->size = newSize;
+  p->boxCollider = newCol;
   
   p->prox = *list;
   *list = p;
