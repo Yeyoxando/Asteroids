@@ -9,9 +9,13 @@
 #include <esat_extra/sqlite3.h>
 #include "lib_diego/ld_graphic.h"
 #include "lib_diego/ld_ui.h"
+#include "lib_diego/ld_math.h"
 
 Box* menuBoxes=NULL;
 sqlite3 *db;
+
+const int width=800;
+const int height=700;
 
 int charCounter;
 struct User{
@@ -33,278 +37,243 @@ bool activeNewUserMenu = false;
 bool activeDeleteMenu = false;
 bool activeModifyMenu = false;
 bool activeModifyMenu2 = false;
-bool activeMainMenu = false;
+bool activeMenuMain = false;
 
 int scene = 0;
 
-int callbacks = 0;
 std::string userSearch;
 bool foundedUser = false;
-User* readUsers;
+std::string readUsers[96];
+int readUsersCount;
+int usersListPage = 0;
 
-static int callback(void *NotUsed, int argc, char **argv, char **azColName) {
-	callbacks++;
-	readUsers = (User*) calloc (callbacks, sizeof(User));
-   int i;
-	 /*for(i = 0; i<argc; i++) {
-      printf("% 17s    ", azColName[i]);
-   }
-   printf("\n");*/
-   for(i = 0; i<argc; i++) {
-      printf("% 12s    ", argv[i] ? argv[i] : "NULL");
-   }
-   printf("\n%d\n", callbacks);
-   return 0;
-	 
-	 //Cambiar el user por un array de strings para poder controlarlo desde el bucle y luego meterselos con el for segundo
+static int DBShowUsers(void *NotUsed, int argc, char **argv, char **azColName) {
+	readUsers[readUsersCount] = argv[0];
+	readUsersCount++;
+  return 0;
 }
 
-static int callbackSelect(void *NotUsed, int argc, char **argv, char **azColName) {
-	callbacks++;
-	readUsers = (User*) calloc (callbacks, sizeof(User));
-   int i;
-	 /*for(i = 0; i<argc; i++) {
-      printf("% 17s    ", azColName[i]);
-   }
-   printf("\n");*/
-   for(i = 0; i<argc; i++) {
-      printf("% 12s    ", argv[i] ? argv[i] : "NULL");
-   }
-	 if(argv[0] == userSearch){ 
+static int DBFindUser(void *NotUsed, int argc, char **argv, char **azColName) {
+	if(argv[0] == userSearch){ 
 		foundedUser = true;
 		errMsg = "User found";
-	 }
-   return 0;
-	 
-	 //Cambiar el user por un array de strings para poder controlarlo desde el bucle y luego meterselos con el for segundo
+	}
+  return 0;
 }
 
-static int callbackModify(void *NotUsed, int argc, char **argv, char **azColName) {
-	callbacks++;
-	readUsers = (User*) calloc (callbacks, sizeof(User));
-   int i;
-	 /*for(i = 0; i<argc; i++) {
-      printf("% 17s    ", azColName[i]);
-   }
-   printf("\n");*/
-   for(i = 0; i<argc; i++) {
-      printf("% 12s    ", argv[i] ? argv[i] : "NULL");
-   }
+static int DBGetUserToModify(void *NotUsed, int argc, char **argv, char **azColName) {
+	newUser.username = argv[0];
+	newUser.email = argv[1];
+	newUser.password = argv[2];
+	newUser.name = argv[3];
+	newUser.surnames = argv[4];
+	newUser.birthdate = argv[5];
+	newUser.province = argv[6];
+	newUser.country = argv[7];
+	newUser.credits = argv[8];
 	 
-	 newUser.username = argv[0];
-	 newUser.email = argv[1];
-	 newUser.password = argv[2];
-	 newUser.name = argv[3];
-	 newUser.surnames = argv[4];
-	 newUser.birthdate = argv[5];
-	 newUser.province = argv[6];
-	 newUser.country = argv[7];
-	 newUser.credits = argv[8];
-	 
-   return 0;
-	 
-	 //Cambiar el user por un array de strings para poder controlarlo desde el bucle y luego meterselos con el for segundo
+  return 0;
 }
 
-void CreateDB(){
-   char *zErrMsg = 0;
-   int rc;
-   char *sql;
+void DBExecuteCreate(){
+  char *zErrMsg = 0;
+  int rc;
+  char *sql;
 
-   /* Open database */
-   rc = sqlite3_open("Asteroids_db.db", &db);
+  /* Open database */
+  rc = sqlite3_open("Asteroids_db.db", &db);
    
-   if( rc ) {
-      fprintf(stderr, "Can't open database: %s\n", sqlite3_errmsg(db));
-   }
+  if( rc ) {
+    fprintf(stderr, "Can't open database: %s\n", sqlite3_errmsg(db));
+  }
 
-   /* Create SQL statement */
-   sql = "CREATE TABLE IF NOT EXISTS USERS ("  \
-         "Username  VARCHAR (50) PRIMARY KEY," \
-         "Email     VARCHAR (50) UNIQUE," \
-         "Password  VARCHAR (50) NOT NULL," \
-         "Name      VARCHAR (50) NOT NULL," \
-         "Surnames  VARCHAR (75) NOT NULL," \
-				 "Birthdate VARCHAR (50) NOT NULL," \
-				 "Province  VARCHAR (50) NOT NULL," \
-				 "Country   VARCHAR (50) NOT NULL," \
-				 "Credits   INT (3)      NOT NULL " \
-				 ");";
+  /* Create SQL statement */
+  sql = "CREATE TABLE IF NOT EXISTS USERS ("  \
+        "Username  VARCHAR (50) PRIMARY KEY," \
+        "Email     VARCHAR (50) UNIQUE," \
+        "Password  VARCHAR (50) NOT NULL," \
+        "Name      VARCHAR (50) NOT NULL," \
+        "Surnames  VARCHAR (75) NOT NULL," \
+	  		"Birthdate VARCHAR (50) NOT NULL," \
+			  "Province  VARCHAR (50) NOT NULL," \
+				"Country   VARCHAR (50) NOT NULL," \
+				"Credits   INT (3)      NOT NULL " \
+				");";
 
-   /* Execute SQL statement */
-   rc = sqlite3_exec(db, sql, callback, 0, &zErrMsg);
-   callbacks=0;
-   if( rc != SQLITE_OK ){
-   fprintf(stderr, "SQL error: %s\n", zErrMsg);
-      sqlite3_free(zErrMsg);
-   }
-   sqlite3_close(db);
+  /* Execute SQL statement */
+  rc = sqlite3_exec(db, sql, DBShowUsers, 0, &zErrMsg);
+	 
+  if( rc != SQLITE_OK ){
+    fprintf(stderr, "SQL error: %s\n", zErrMsg);
+    sqlite3_free(zErrMsg);
+  }
+  sqlite3_close(db);
 }
 
-void AddUserToDB(){
-   char *zErrMsg = 0;
-   int rc;
-   std::string sql;
-	 if(newUser.username.length() > 0 && newUser.email.length() > 0 && newUser.password.length() > 0 && newUser.name.length() > 0 &&
-			newUser.surnames.length() > 0 && newUser.birthdate.length() > 0 && newUser.province.length() > 0 && newUser.country.length() > 0){
-		 rc = sqlite3_open("Asteroids_db.db", &db);
+void DBExecuteInsert(){
+  char *zErrMsg = 0;
+  int rc;
+  std::string sql;
+	if(newUser.username.length() > 0 && newUser.email.length() > 0 && newUser.password.length() > 0 && newUser.name.length() > 0 &&
+		newUser.surnames.length() > 0 && newUser.birthdate.length() > 0 && newUser.province.length() > 0 && newUser.country.length() > 0){
+		rc = sqlite3_open("Asteroids_db.db", &db);
 
-		 if( rc ) {
-				fprintf(stderr, "Can't open database: %s\n", sqlite3_errmsg(db));
-		 }
+		if( rc ) {
+			fprintf(stderr, "Can't open database: %s\n", sqlite3_errmsg(db));
+		}
 		 
-		 sql = "INSERT INTO USERS (Username, Email, Password, Name, Surnames, Birthdate, Province, Country, Credits) "  \
-					 "VALUES ('"+newUser.username+"', '"+newUser.email+"', '"+newUser.password+"', '"+newUser.name+"', '" \
-					 +newUser.surnames+"', '"+newUser.birthdate+"', '"+newUser.province+"', '"+newUser.country+"', '"+newUser.credits+"'); ";
+		sql = "INSERT INTO USERS (Username, Email, Password, Name, Surnames, Birthdate, Province, Country, Credits) "  \
+					"VALUES ('"+newUser.username+"', '"+newUser.email+"', '"+newUser.password+"', '"+newUser.name+"', '" \
+					+newUser.surnames+"', '"+newUser.birthdate+"', '"+newUser.province+"', '"+newUser.country+"', '"+newUser.credits+"'); ";
 		 
-		 char *sqlChar = new char[sql.length() + 1];
-		 strcpy(sqlChar, sql.c_str());
+		char *sqlChar = new char[sql.length() + 1];
+		strcpy(sqlChar, sql.c_str());
 	 
-		 rc = sqlite3_exec(db, sqlChar, callback, 0, &zErrMsg);
+		rc = sqlite3_exec(db, sqlChar, DBShowUsers, 0, &zErrMsg);
 		 
-		 if( rc != SQLITE_OK ){
-				fprintf(stderr, "SQL error: %s\n", zErrMsg);
-				sqlite3_free(zErrMsg);
-				errMsg = "SQL error";
-		 } else {
-				errMsg="user saved";
-		 }
-		 sqlite3_close(db);
+		if( rc != SQLITE_OK ){
+			fprintf(stderr, "SQL error: %s\n", zErrMsg);
+			sqlite3_free(zErrMsg);
+			errMsg = "SQL error";
+		} else {
+			errMsg="user saved";
+		}
+		sqlite3_close(db);
 	}
 	else{ 
 		errMsg="fill all the fields";
 	}
 }
 
-void DeleteUserDB(){
-   char *zErrMsg = 0;
-   int rc;
-   std::string sql;
-	 rc = sqlite3_open("Asteroids_db.db", &db);
+void DBExecuteDelete(){
+  char *zErrMsg = 0;
+  int rc;
+  std::string sql;
+	rc = sqlite3_open("Asteroids_db.db", &db);
 
-		 if( rc ) {
-				fprintf(stderr, "Can't open database: %s\n", sqlite3_errmsg(db));
-		 }
+	if( rc ) {
+		fprintf(stderr, "Can't open database: %s\n", sqlite3_errmsg(db));
+	}
 		 
-		 sql = "DELETE FROM USERS WHERE Username = '" + userSearch + "';";
+	sql = "DELETE FROM USERS WHERE Username = '" + userSearch + "';";
 		 
-		 char *sqlChar = new char[sql.length() + 1];
-		 strcpy(sqlChar, sql.c_str());
+	char *sqlChar = new char[sql.length() + 1];
+	strcpy(sqlChar, sql.c_str());
 	 
-		 rc = sqlite3_exec(db, sqlChar, callback, 0, &zErrMsg);
+	rc = sqlite3_exec(db, sqlChar, DBShowUsers, 0, &zErrMsg);
 		 
-		 if( rc != SQLITE_OK ){
-				fprintf(stderr, "SQL error: %s\n", zErrMsg);
-				sqlite3_free(zErrMsg);
-				errMsg = "SQL error";
-		 } else {
-				errMsg="user deleted";
-		 }
-		 sqlite3_close(db);
+	if( rc != SQLITE_OK ){
+		fprintf(stderr, "SQL error: %s\n", zErrMsg);
+		sqlite3_free(zErrMsg);
+		errMsg = "SQL error";
+	} else {
+		errMsg="user deleted";
+	}
+	sqlite3_close(db);
 }
 
-void SelectUserDB(){
-		sqlite3 *db;
-		char *zErrMsg = 0;
-		int rc;
-		std::string sql;
-		const char* data = "Callback function called";
+void DBExecuteSelect(){
+	sqlite3 *db;
+	char *zErrMsg = 0;
+	int rc;
+	std::string sql;
+	const char* data = "Callback function called";
 
-		/* Open database */
-		rc = sqlite3_open("Asteroids_db.db", &db);
+	/* Open database */
+	rc = sqlite3_open("Asteroids_db.db", &db);
 		 
-		if( rc ) {
-			fprintf(stderr, "Can't open database: %s\n", sqlite3_errmsg(db));
-		}
+	if( rc ) {
+		fprintf(stderr, "Can't open database: %s\n", sqlite3_errmsg(db));
+	}
 		
-		sql = "SELECT Username FROM USERS WHERE Username = '" + userSearch + "';";
+	sql = "SELECT Username FROM USERS WHERE Username = '" + userSearch + "';";
 
-		char *sqlChar = new char[sql.length() + 1];
-		strcpy(sqlChar, sql.c_str());
+	char *sqlChar = new char[sql.length() + 1];
+	strcpy(sqlChar, sql.c_str());
 					
-		/* Execute SQL statement */
-		rc = sqlite3_exec(db, sqlChar, callbackSelect, (void*)data, &zErrMsg);
+	/* Execute SQL statement */
+	rc = sqlite3_exec(db, sqlChar, DBFindUser, (void*)data, &zErrMsg);
 		 
-		if(!foundedUser){
-			errMsg = "Can't find this user";
-		}
+	if(!foundedUser){
+		errMsg = "Can't find this user";
+	}
 		 
-		if( rc != SQLITE_OK ) {
-			fprintf(stderr, "SQL error: %s\n", zErrMsg);
-			sqlite3_free(zErrMsg);
-		}
-		sqlite3_close(db);
+	if( rc != SQLITE_OK ) {
+		fprintf(stderr, "SQL error: %s\n", zErrMsg);
+		sqlite3_free(zErrMsg);
+	}
+	sqlite3_close(db);
 }
 
-void ModifyUserDB(){
-		sqlite3 *db;
-		char *zErrMsg = 0;
-		int rc;
-		std::string sql;
-		const char* data = "Callback function called";
+void DBExecuteModify(){
+	sqlite3 *db;
+	char *zErrMsg = 0;
+	int rc;
+	std::string sql;
+	const char* data = "Callback function called";
 
-		/* Open database */
-		rc = sqlite3_open("Asteroids_db.db", &db);
+	/* Open database */
+	rc = sqlite3_open("Asteroids_db.db", &db);
 		 
-		if( rc ) {
-			fprintf(stderr, "Can't open database: %s\n", sqlite3_errmsg(db));
-		}
+	if( rc ) {
+		fprintf(stderr, "Can't open database: %s\n", sqlite3_errmsg(db));
+	}
 		
-		sql = "SELECT * FROM USERS WHERE Username = '" + userSearch + "';";
+	sql = "SELECT * FROM USERS WHERE Username = '" + userSearch + "';";
 
-		char *sqlChar = new char[sql.length() + 1];
-		strcpy(sqlChar, sql.c_str());
+	char *sqlChar = new char[sql.length() + 1];
+	strcpy(sqlChar, sql.c_str());
 					
-		/* Execute SQL statement */
-		rc = sqlite3_exec(db, sqlChar, callbackModify, (void*)data, &zErrMsg);
+	/* Execute SQL statement */
+	rc = sqlite3_exec(db, sqlChar, DBGetUserToModify, (void*)data, &zErrMsg);
 		 
-		if( rc != SQLITE_OK ) {
-			fprintf(stderr, "SQL error: %s\n", zErrMsg);
-			sqlite3_free(zErrMsg);
-		}
-		sqlite3_close(db);
+	if( rc != SQLITE_OK ) {
+		fprintf(stderr, "SQL error: %s\n", zErrMsg);
+		sqlite3_free(zErrMsg);
+	}
+	sqlite3_close(db);
 }
 
-void UpdateUserDB(){
-		sqlite3 *db;
-		char *zErrMsg = 0;
-		int rc;
-		std::string sql;
-		const char* data = "Callback function called";
+void DBExecuteUpdate(){
+	sqlite3 *db;
+	char *zErrMsg = 0;
+	int rc;
+	std::string sql;
+	const char* data = "Callback function called";
 
-		/* Open database */
-		rc = sqlite3_open("Asteroids_db.db", &db);
+	/* Open database */
+	rc = sqlite3_open("Asteroids_db.db", &db);
 		 
-		if( rc ) {
-			fprintf(stderr, "Can't open database: %s\n", sqlite3_errmsg(db));
-		}
+	if( rc ) {
+		fprintf(stderr, "Can't open database: %s\n", sqlite3_errmsg(db));
+	}
 		
-		sql = "DELETE FROM USERS WHERE Username = '" + userSearch + "';";
+	sql = "DELETE FROM USERS WHERE Username = '" + userSearch + "';";
 
-		char *sqlChar = new char[sql.length() + 1];
-		strcpy(sqlChar, sql.c_str());
+	char *sqlChar = new char[sql.length() + 1];
+	strcpy(sqlChar, sql.c_str());
 				
-		/* Execute SQL statement */
-		rc = sqlite3_exec(db, sqlChar, callbackModify, (void*)data, &zErrMsg);
+	/* Execute SQL statement */
+	rc = sqlite3_exec(db, sqlChar, DBGetUserToModify, (void*)data, &zErrMsg);
 		
-		sql = "INSERT INTO USERS (Username, Email, Password, Name, Surnames, Birthdate, Province, Country, Credits) "  \
-					 "VALUES ('"+newUser.username+"', '"+newUser.email+"', '"+newUser.password+"', '"+newUser.name+"', '" \
-					 +newUser.surnames+"', '"+newUser.birthdate+"', '"+newUser.province+"', '"+newUser.country+"', '"+newUser.credits+"'); ";
+	sql = "INSERT INTO USERS (Username, Email, Password, Name, Surnames, Birthdate, Province, Country, Credits) "  \
+				"VALUES ('"+newUser.username+"', '"+newUser.email+"', '"+newUser.password+"', '"+newUser.name+"', '" \
+				+newUser.surnames+"', '"+newUser.birthdate+"', '"+newUser.province+"', '"+newUser.country+"', '"+newUser.credits+"'); ";
 		 
-		sqlChar = new char[sql.length() + 1];
-		strcpy(sqlChar, sql.c_str());
+	sqlChar = new char[sql.length() + 1];
+	strcpy(sqlChar, sql.c_str());
 				
-		/* Execute SQL statement */
-		rc = sqlite3_exec(db, sqlChar, callbackModify, (void*)data, &zErrMsg);
+	/* Execute SQL statement */
+	rc = sqlite3_exec(db, sqlChar, DBGetUserToModify, (void*)data, &zErrMsg);
 		
-		if( rc != SQLITE_OK ) {
-			fprintf(stderr, "SQL error: %s\n", zErrMsg);
-			sqlite3_free(zErrMsg);
-		}
-		sqlite3_close(db);
+	if( rc != SQLITE_OK ) {
+		fprintf(stderr, "SQL error: %s\n", zErrMsg);
+		sqlite3_free(zErrMsg);
+	}
+	sqlite3_close(db);
 }
 
-void ReadDBInfo(){
+void DBExecuteReadUsers(){
 	sqlite3 *db;
   char *zErrMsg = 0;
   int rc;
@@ -317,11 +286,11 @@ void ReadDBInfo(){
   if( rc ) {
     fprintf(stderr, "Can't open database: %s\n", sqlite3_errmsg(db));
   }
-
-  sql = "SELECT * from USERS";
+	
+	sql = "SELECT Username FROM USERS";
 
   /* Execute SQL statement */
-  rc = sqlite3_exec(db, sql, callback, (void*)data, &zErrMsg);
+  rc = sqlite3_exec(db, sql, DBShowUsers, (void*)data, &zErrMsg);
    
   if( rc != SQLITE_OK ) {
     fprintf(stderr, "SQL error: %s\n", zErrMsg);
@@ -341,9 +310,12 @@ void InitializeMainMenu(){
 
 void InitializeListMenu(){
 	errMsg = "";
-	menuBoxes = (Box*) calloc(1, sizeof(Box));
-	menuBoxes[0].CreateBox(193, 577, 200, 40, &menuBoxes[0].boxPoints);
-	ReadDBInfo();
+	readUsersCount = 0;
+	menuBoxes = (Box*) calloc(3, sizeof(Box));
+	menuBoxes[0].CreateBox(275, 577, 200, 40, &menuBoxes[0].boxPoints);
+	menuBoxes[1].CreateBox(5, 310, 40, 40, &menuBoxes[1].boxPoints);
+	menuBoxes[2].CreateBox(755, 310, 40, 40, &menuBoxes[2].boxPoints);
+	DBExecuteReadUsers();
 }
 
 void InitializeNewUserMenu(){
@@ -400,7 +372,14 @@ void InitializeModifyMenu2(){
 	menuBoxes[12].CreateBox(640, 360, 40, 40, &menuBoxes[12].boxPoints);
 }
 
-void MainMenu(){
+void DeselectTextFields(int textFields, Box *activeTextField){
+	for(int i = 0; i < textFields; i++){
+		menuBoxes[i].selected = false;
+	}
+	(*activeTextField).selected = true;
+}
+
+void MenuMain(){
 	esat::DrawSetTextSize(80);
 	esat::DrawSetFillColor(255, 255, 255);
 	esat::DrawText(100, 100, "Asteroids admin");
@@ -439,33 +418,49 @@ void MainMenu(){
 	DrawTextPlus(260, 495, "Modify user", black, white, menuBoxes[3]);
 }
 
-void Initialize(){
-	esat::DrawSetTextFont("resources/fonts/Hyperspace Bold.otf");
-	InitializeMainMenu();
-	CreateDB();
-}
-
-void UsersList(){
+void MenuUsersList(){
+	esat::Mat3 transform;
 	esat::DrawSetFillColor(255, 255, 255);
 	esat::DrawSetTextSize(80);
-	esat::DrawText(220, 80, "Users");
+	esat::DrawText(280, 100, "Users");
 	esat::DrawSetTextSize(40);
+	
+	for(int j = 0; j < 3; j++){
+		for(int i = 0; i < 8; i++){
+			char* nameChar = new char[readUsers[i+((j+(usersListPage*3))*8)].length() + 1];
+			strcpy(nameChar, readUsers[i+((j+(usersListPage*3))*8)].c_str());
+			esat::DrawText(110 + j * 200, 180 + i * 50, nameChar);
+		}
+	}
+	
 	if(menuBoxes[0].isMouseOver() && esat::MouseButtonDown(0)){
 		scene = 0;
-		activeMainMenu = true;
+		activeMenuMain = true;
 	}
 	menuBoxes[0].DrawButton(menuBoxes[0].isMouseOver(), white);
-	DrawTextPlus(225, 610, "Return", black, white, menuBoxes[0]);
-}
-
-void DeselectTextFields(int textFields, Box *activeTextField){
-	for(int i = 0; i < textFields; i++){
-		menuBoxes[i].selected = false;
+	DrawTextPlus(315, 610, "Return", black, white, menuBoxes[0]);
+	
+	if(usersListPage > 0){
+		if(menuBoxes[1].isMouseOver() && esat::MouseButtonDown(0)){
+			usersListPage--;
+		}
+		menuBoxes[1].DrawButton(menuBoxes[1].isMouseOver(), white);
+		transform = Mat3Transform(24, 329, 2, 2, 0);
+		esat::DrawSetFillColor(0, 0, 0);
+		DrawArrow(transform, 90);
 	}
-	(*activeTextField).selected = true;
+	if(usersListPage < readUsersCount/24){
+		if(menuBoxes[2].isMouseOver() && esat::MouseButtonDown(0)){
+			usersListPage++;
+		}
+		menuBoxes[2].DrawButton(menuBoxes[2].isMouseOver(), white);
+		transform = Mat3Transform(776, 329, 2, 2, 0);
+		esat::DrawSetFillColor(0, 0, 0);
+		DrawArrow(transform, -90);
+	}
 }
 
-void NewUserMenu(){
+void MenuNewUser(){
 	esat::DrawSetFillColor(255, 255, 255);
 	esat::DrawSetTextSize(80);
 	esat::DrawText(220, 80, "New user");
@@ -510,13 +505,13 @@ void NewUserMenu(){
 
 	if(menuBoxes[9].isMouseOver() && esat::MouseButtonDown(0)){
 		scene = 0;
-		activeMainMenu = true;
+		activeMenuMain = true;
 	}
 	menuBoxes[9].DrawButton(menuBoxes[9].isMouseOver(), white);
 	DrawTextPlus(225, 610, "Return", black, white, menuBoxes[9]);
 	
 	if(menuBoxes[10].isMouseOver() && esat::MouseButtonDown(0)){
-		AddUserToDB();
+		DBExecuteInsert();
 	}
 	menuBoxes[10].DrawButton(menuBoxes[10].isMouseOver(), white);
 	DrawTextPlus(425, 610, "Add user", black, white, menuBoxes[10]);
@@ -534,7 +529,7 @@ void NewUserMenu(){
 	DrawTextPlus(653, 395, "/", black, white, menuBoxes[12]);
 }
 
-void DeleteUserMenu(){
+void MenuDeleteUser(){
 	esat::DrawSetFillColor(255, 255, 255);
 	esat::DrawSetTextSize(80);
 	esat::DrawText(180, 80, "Delete user");
@@ -547,28 +542,29 @@ void DeleteUserMenu(){
 	
 	if(menuBoxes[2].isMouseOver() && esat::MouseButtonDown(0)){
 		foundedUser = false;
-		SelectUserDB();
+		DBExecuteSelect();
 	}
 	menuBoxes[2].DrawButton(menuBoxes[2].isMouseOver(), white);
 	DrawTextPlus(342, 272, "Search", black, white, menuBoxes[2]);
 	
 	if(menuBoxes[0].isMouseOver() && esat::MouseButtonDown(0)){
 		scene = 0;
-		activeMainMenu = true;
+		activeMenuMain = true;
+		foundedUser = false;
 	}
 	menuBoxes[0].DrawButton(menuBoxes[0].isMouseOver(), white);
 	DrawTextPlus(340, 583, "Return", black, white, menuBoxes[0]);
 	
 	if(foundedUser){
 		if(menuBoxes[3].isMouseOver() && esat::MouseButtonDown(0)){
-			DeleteUserDB();
+			DBExecuteDelete();
 		}
 		menuBoxes[3].DrawButton(menuBoxes[3].isMouseOver(), white);
 		DrawTextPlus(340, 433, "Delete", black, white, menuBoxes[3]);
 	}
 }
 
-void ModifyUserMenu(){
+void MenuModifyUser(){
 	esat::DrawSetFillColor(255, 255, 255);
 	esat::DrawSetTextSize(80);
 	esat::DrawText(180, 80, "Modify user");
@@ -581,21 +577,22 @@ void ModifyUserMenu(){
 	
 	if(menuBoxes[2].isMouseOver() && esat::MouseButtonDown(0)){
 		foundedUser = false;
-		SelectUserDB();
+		DBExecuteSelect();
 	}
 	menuBoxes[2].DrawButton(menuBoxes[2].isMouseOver(), white);
 	DrawTextPlus(342, 272, "Search", black, white, menuBoxes[2]);
 	
 	if(menuBoxes[0].isMouseOver() && esat::MouseButtonDown(0)){
 		scene = 0;
-		activeMainMenu = true;
+		activeMenuMain = true;
+		foundedUser = false;
 	}
 	menuBoxes[0].DrawButton(menuBoxes[0].isMouseOver(), white);
 	DrawTextPlus(340, 583, "Return", black, white, menuBoxes[0]);
 	
 	if(foundedUser){
 		if(menuBoxes[3].isMouseOver() && esat::MouseButtonDown(0)){
-			ModifyUserDB();
+			DBExecuteModify();
 			scene = 5;
 			activeModifyMenu2 = true;
 		}
@@ -604,7 +601,7 @@ void ModifyUserMenu(){
 	}
 }
 
-void ModifyUserMenu2(){
+void MenuModifyUser2(){
 	esat::DrawSetFillColor(255, 255, 255);
 	esat::DrawSetTextSize(80);
 	esat::DrawText(180, 80, "Modify user");
@@ -649,13 +646,13 @@ void ModifyUserMenu2(){
 
 	if(menuBoxes[9].isMouseOver() && esat::MouseButtonDown(0)){
 		scene = 0;
-		activeMainMenu = true;
+		activeMenuMain = true;
 	}
 	menuBoxes[9].DrawButton(menuBoxes[9].isMouseOver(), white);
 	DrawTextPlus(225, 610, "Return", black, white, menuBoxes[9]);
 	
 	if(menuBoxes[10].isMouseOver() && esat::MouseButtonDown(0)){
-		UpdateUserDB();
+		DBExecuteUpdate();
 	}
 	menuBoxes[10].DrawButton(menuBoxes[10].isMouseOver(), white);
 	DrawTextPlus(425, 610, "Modify user", black, white, menuBoxes[10]);
@@ -674,41 +671,47 @@ void ModifyUserMenu2(){
 }
 
 void MenuController(){
-	if(activeMainMenu) {
+	if(activeMenuMain) {
 		InitializeMainMenu();
-		activeMainMenu = false;
+		activeMenuMain = false;
 	}
-	if(scene == 0) MainMenu();
+	if(scene == 0) MenuMain();
 	
 	if(activeListMenu) {
 		InitializeListMenu();
 		activeListMenu = false;
 	}
-	if(scene == 1) UsersList();
+	if(scene == 1) MenuUsersList();
 	
 	if(activeNewUserMenu) {
 		InitializeNewUserMenu();
 		activeNewUserMenu = false;
 	}
-	if(scene == 2) NewUserMenu();
+	if(scene == 2) MenuNewUser();
 	
 	if(activeDeleteMenu) {
 		InitializeDeleteMenu();
 		activeDeleteMenu = false;
 	}
-	if(scene == 3) DeleteUserMenu();
+	if(scene == 3) MenuDeleteUser();
 	
 	if(activeModifyMenu) {
 		InitializeModifyMenu();
 		activeModifyMenu = false;
 	}
-	if(scene == 4) ModifyUserMenu();
+	if(scene == 4) MenuModifyUser();
 	
 	if(activeModifyMenu2) {
 		InitializeModifyMenu2();
 		activeModifyMenu2 = false;
 	}
-	if(scene == 5) ModifyUserMenu2();
+	if(scene == 5) MenuModifyUser2();
+}
+
+void Initialize(){
+	esat::DrawSetTextFont("resources/fonts/Hyperspace Bold.otf");
+	InitializeMainMenu();
+	DBExecuteCreate();
 }
 
 void Exit(){
@@ -717,7 +720,7 @@ void Exit(){
 }
 
 int esat::main(int argc, char **argv) {
-	esat::WindowInit(800, 700);
+	esat::WindowInit(width, height);
 	esat::WindowSetMouseVisibility(true);
 	
 	Initialize();

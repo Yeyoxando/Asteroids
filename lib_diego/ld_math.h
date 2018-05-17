@@ -154,3 +154,29 @@ void DrawQuad(esat::Mat3 transform){
 	
 	esat::DrawPath(points, 5);
 }
+
+void DrawArrow(esat::Mat3 transform, float initialRotation){
+	esat::Vec3* quad = (esat::Vec3*) calloc (7, sizeof(esat::Vec3));
+	quad[0] = {20, 10, 1};
+	quad[1] = {15, 0, 1};
+	quad[2] = {12, 0, 1};
+	quad[3] = {20, 16, 1};
+	quad[4] = {28, 0, 1};
+	quad[5] = {25, 0, 1};
+	quad[6] = {20, 10, 1};
+
+	esat::Mat3 correction = Mat3TransformOffset(-20, -8, 1, 1, DegreesToRadian(initialRotation));
+	for(int i = 0; i < 7; i++){
+		quad[i] = esat::Mat3TransformVec3(correction, quad[i]);
+	}
+	
+	float* points = (float*) calloc (14, sizeof(float));
+	
+	for(int i = 0; i < 7; i++){
+		quad[i] = esat::Mat3TransformVec3(transform, quad[i]);
+		points[(i*2)] = quad[i].x;
+		points[(i*2)+1] = quad[i].y;
+	}
+	
+	esat::DrawSolidPath(points, 7);
+}
